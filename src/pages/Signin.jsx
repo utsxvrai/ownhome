@@ -62,10 +62,10 @@ export default function Signin() {
             </div>
             <div className="flex justify-between whitespace-nowrap text-sm ">
               <p> Don't have a account?
-              <Link to='/sign-up' className='text-red-800 transition ease-in-out hover:text-red-700 hover:font-bold'> Register</Link>
+              <Link to="/sign-up"  className='text-red-800 transition ease-in-out hover:text-red-700 hover:font-bold'> Register</Link>
               </p>
               <p>
-              <Link to="forgotpassword" className='text-green-800 hover:text-green-700  hover:font-bold'>Forgot Password?</Link>
+              <Link to="/forgotpassword" className='text-green-800 hover:text-green-700  hover:font-bold'>Forgot Password?</Link>
               </p>
               
 
