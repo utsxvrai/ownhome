@@ -1,10 +1,15 @@
 import React from 'react'
 import { IoEye } from "react-icons/io5";
 import { IoEyeOff } from "react-icons/io5";
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import OAuth from '../components/OAuth';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { toast } from 'react-toastify';
+
+
 
 export default function Signin() {
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = React.useState(false);
   const [formData, setFormData] = React.useState({
     email: '',
@@ -17,6 +22,23 @@ export default function Signin() {
       ...prevState,
       [e.target.id]: e.target.value,
     }));
+  }
+  async function onSubmit(e) {
+    e.preventDefault();
+    try {
+      const auth = getAuth();
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      console.log("User signed in:", userCredential);
+      if (userCredential.user) {
+        navigate("/");
+      }
+    } catch (error) {
+      toast.error("Bad user credentials");
+    }
   }
 
 
@@ -32,7 +54,7 @@ export default function Signin() {
         </div>
       
         <div className="w-full  md:w-[67%] lg:w-[40%] lg:ml-20">
-          <form>
+          <form onSubmit={onSubmit} >
             <input type ='email' id ='email' 
             value={email} 
             onChange={onChange}
@@ -73,7 +95,7 @@ export default function Signin() {
 
 
           
-          <button
+          <button 
           className="w-full bg-green-800 text-white px-7 py-3 text-sm font-semibold rounded shadow-md  mt-6 transition ease-in-out hover:bg-green-700 hover:shadow-xl active:bg-green-800" type='submit'
           
           >SIGN IN</button>
