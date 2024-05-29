@@ -1,11 +1,12 @@
 import React from 'react'
 import { IoEye } from "react-icons/io5";
 import { IoEyeOff } from "react-icons/io5";
-import { Link } from 'react-router-dom';
+import { Link , useNavigate } from 'react-router-dom';
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import {db} from '../firebase';
 import OAuth from '../components/OAuth';
 import { setDoc, doc , serverTimestamp} from 'firebase/firestore';
+import { toast } from 'react-toastify';
 
 export default function Signup() {
   const [showPassword, setShowPassword] = React.useState(false);
@@ -15,6 +16,7 @@ export default function Signup() {
     password: ''
   });
   const { name, email, password } = formData;
+  const navigate = useNavigate();
 
   function onChange(e) {
     setFormData((prevState) => ({
@@ -39,9 +41,10 @@ export default function Signup() {
       delete formDataCopy.password;
       formDataCopy.timestamp = serverTimestamp();
       await setDoc(doc(db, "users", user.uid), formDataCopy);
-      console.log("User Created"); 
+      navigate('/');
+  
     } catch (error) {
-      console.log("Error");
+      toast.error("Something is Wrong! Try again")
     }
 
   }
