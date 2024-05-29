@@ -1,15 +1,37 @@
-import React from 'react'
-import { Link } from 'react-router-dom';
+import {useState} from 'react'
+import { Link, useNavigate } from 'react-router-dom';
 import OAuth from '../components/OAuth';
+import { toast } from 'react-toastify';
+import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
+
+
 
 export default function Forgotpassword() {
-  const [formData, setEmail] = React.useState({
-    email: ''
-  });
-  const { email } = formData;
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  
 
   function onChange(e) {
     setEmail( e.target.value);
+  }
+
+  async function onSubmit(e){
+    e.preventDefault();
+    try {
+      const auth = getAuth();
+      await sendPasswordResetEmail(auth, email);
+      // send error if no user found
+      if(email){
+        toast.success("Password reset link sent to your email")
+        navigate('/sign-in');
+      }
+      
+      
+
+    } catch (error) {
+      toast.error("No user found with this email")
+    }
+
   }
 
 
@@ -25,7 +47,7 @@ export default function Forgotpassword() {
         </div>
       
         <div className="w-full  md:w-[67%] lg:w-[40%] lg:ml-20">
-          <form>
+          <form onSubmit={onSubmit}>
             <input type ='email' id ='email' 
             value={email} 
             onChange={onChange}
@@ -37,7 +59,7 @@ export default function Forgotpassword() {
               <Link to='/sign-up' className='text-red-800 transition ease-in-out hover:text-red-700 hover:font-bold'> Register</Link>
               </p>
               <p>
-              <Link to="Sign-in" className='text-sm  text-green-800 hover:text-green-700  hover:font-bold'>Sign-in</Link>
+              <Link to="/sign-in" className='text-sm  text-green-800 hover:text-green-700  hover:font-bold'>Sign-in</Link>
               </p>
               
 
