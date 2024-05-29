@@ -3,16 +3,13 @@ import { Link } from 'react-router-dom';
 import OAuth from '../components/OAuth';
 
 export default function Forgotpassword() {
-  const [formData, setFormData] = React.useState({
+  const [formData, setEmail] = React.useState({
     email: ''
   });
   const { email } = formData;
 
   function onChange(e) {
-    setFormData((prevState) => ({
-      ...prevState,
-      [e.target.id]: e.target.value,
-    }));
+    setEmail( e.target.value);
   }
 
 
