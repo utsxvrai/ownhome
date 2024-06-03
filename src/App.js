@@ -18,14 +18,16 @@ function App() {
         <Header />
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/profile" element={<PrivateRoute  />} >
+          <Route path="/profile" element={<PrivateRoute  />} >  
             <Route path="/profile" element={<Profile/>}/>
           </Route>
           <Route path="/sign-in" element={<Signin />} />
           <Route path="/sign-up" element={<Signup />} />
           <Route path="/forgotpassword" element={<Forgotpassword />} />
           <Route path="/offers" element={<Offers />} />
-          <Route path="/create-listing" element={<CreateListing />} />
+          <Route path="/create-listing" element={<PrivateRoute  />} >
+            <Route path="/create-listing" element={<CreateListing/>}/>
+          </Route>
         </Routes>
       </Router>
       <ToastContainer
