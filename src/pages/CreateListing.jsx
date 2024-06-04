@@ -1,81 +1,179 @@
 import { useState } from "react";
 import Spinner from "../components/Spinner";
 import { toast } from "react-toastify";
-import { useLocation } from 'react-router-dom';
+import {
+  getStorage,
+  ref,
+  uploadBytesResumable,
+  getDownloadURL,
+} from "firebase/storage";
+import { getAuth } from "firebase/auth";
+import { v4 as uuidv4 } from "uuid";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "../firebase";
+import { useNavigate } from "react-router-dom";
 
 export default function CreateListing() {
-  const [geolocationEnabled , setgeolocationEnabled] = useState(true);
+  const navigate = useNavigate();
+  const auth = getAuth();
+  const [geolocationEnabled, setGeolocationEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    type:"rent",
-    name : "",
-    bedrooms : 0,
-    bathrooms : 0,
-    parkingSpot : false,
-    furnished : false,
-    address : "",
-    description : "",
+    type: "rent",
+    name: "",
+    bedrooms: 1,
+    bathrooms: 1,
+    parking: false,
+    furnished: false,
+    address: "",
+    description: "",
     offer: false,
-    regularPrice:0,
-    discountedPrice:0,
-    latitude : 0,
-    longitude : 0,
-    images : {}
+    regularPrice: 0,
+    discountedPrice: 0,
+    latitude: 0,
+    longitude: 0,
+    images: {},
   });
-  const {type,name, bedrooms, bathrooms, parkingSpot, furnished, address, description, offer,regularPrice, discountedPrice,latitude,longitude,images} = formData;
-
+  const {
+    type,
+    name,
+    bedrooms,
+    bathrooms,
+    parking,
+    address,
+    furnished,
+    description,
+    offer,
+    regularPrice,
+    discountedPrice,
+    latitude,
+    longitude,
+    images,
+  } = formData;
   function onChange(e) {
     let boolean = null;
-    if(e.target.value==="true"){
+    if (e.target.value === "true") {
       boolean = true;
-
     }
-    if(e.target.value==="false"){
+    if (e.target.value === "false") {
       boolean = false;
-
     }
-    // files
-    if(e.target.files){
-      setFormData((prevState) =>({
+    // Files
+    if (e.target.files) {
+      setFormData((prevState) => ({
         ...prevState,
-        images: e.target.files
+        images: e.target.files,
       }));
     }
-    // text, number, select  
-    if(!e.target.files){
-      setFormData((prevState) =>({
+    // Text/Boolean/Number
+    if (!e.target.files) {
+      setFormData((prevState) => ({
         ...prevState,
         [e.target.id]: boolean ?? e.target.value,
       }));
     }
   }
-  async function onSubmit(e){
+  async function onSubmit(e) {
     e.preventDefault();
     setLoading(true);
-    if(discountedPrice >= regularPrice){
+    if (+discountedPrice >= +regularPrice) {
       setLoading(false);
-      toast.error("Discounted price should be less than regular price");
+      toast.error("Discounted price needs to be less than regular price");
+      return;
+    }
+    if (images.length > 6) {
+      setLoading(false);
+      toast.error("maximum 6 images are allowed");
       return;
     }
     let geolocation = {};
     let location;
     if (geolocationEnabled) {
       const response = await fetch(
-        `https://api.opencagedata.com/geocode/v1/json?q=${address}&key=${process.env.REACT_APP_OPENCAGE_API_KEY}`
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${address}&key=${process.env.REACT_APP_GEOCODE_API_KEY}`
       );
       const data = await response.json();
       console.log(data);
-      geolocation.lat = data.results[0]?.geometry?.lat ?? 0;
-      geolocation.lng = data.results[0]?.geometry?.lng ?? 0;
+      geolocation.lat = data.results[0]?.geometry.location.lat ?? 0;
+      geolocation.lng = data.results[0]?.geometry.location.lng ?? 0;
 
-      console.log(geolocation.lat , geolocation.lng);
+      location = data.status === "ZERO_RESULTS" && undefined;
 
-
-
+      if (location === undefined) {
+        setLoading(false);
+        toast.error("please enter a correct address");
+        return;
+      }
+    } else {
+      geolocation.lat = latitude;
+      geolocation.lng = longitude;
     }
+
+    async function storeImage(image) {
+      return new Promise((resolve, reject) => {
+        const storage = getStorage();
+        const filename = `${auth.currentUser.uid}-${image.name}-${uuidv4()}`;
+        const storageRef = ref(storage, filename);
+        const uploadTask = uploadBytesResumable(storageRef, image);
+        uploadTask.on(
+          "state_changed",
+          (snapshot) => {
+            // Observe state change events such as progress, pause, and resume
+            // Get task progress, including the number of bytes uploaded and the total number of bytes to be uploaded
+            const progress =
+              (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            console.log("Upload is " + progress + "% done");
+            switch (snapshot.state) {
+              case "paused":
+                console.log("Upload is paused");
+                break;
+              case "running":
+                console.log("Upload is running");
+                break;
+            }
+          },
+          (error) => {
+            // Handle unsuccessful uploads
+            reject(error);
+          },
+          () => {
+            // Handle successful uploads on complete
+            // For instance, get the download URL: https://firebasestorage.googleapis.com/...
+            getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+              resolve(downloadURL);
+            });
+          }
+        );
+      });
+    }
+
+    const imgUrls = await Promise.all(
+      [...images].map((image) => storeImage(image))
+    ).catch((error) => {
+      setLoading(false);
+      toast.error("Images not uploaded");
+      return;
+    });
+
+    const formDataCopy = {
+      ...formData,
+      imgUrls,
+      geolocation,
+      timestamp: serverTimestamp(),
+      userRef: auth.currentUser.uid,
+    };
+    delete formDataCopy.images;
+    !formDataCopy.offer && delete formDataCopy.discountedPrice;
+    delete formDataCopy.latitude;
+    delete formDataCopy.longitude;
+    const docRef = await addDoc(collection(db, "listings"), formDataCopy);
+    setLoading(false);
+    toast.success("Listing created");
+    navigate(`/category/${formDataCopy.type}/${docRef.id}`);
   }
-  if(loading){
-    return <Spinner/>
+
+  if (loading) {
+    return <Spinner />;
   }
   return (
     <main className="max-w-md opx-2 mx-auto">
@@ -123,17 +221,17 @@ export default function CreateListing() {
         </div>
         <p className="text-lg mt-6 font-semibold">Parking Spot</p>
         <div className="flex justify-between items-center ">
-          <button type="button" id="parkingSpot" value={true}
+          <button type="button" id="parking" value={true}
           onClick={onChange}
           className={`mr-3 uppercase px-7 py-3 font-medium test-sm shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
-            !parkingSpot ? "bg-white text-green-800" : "bg-green-800 text-white" 
+            !parking ? "bg-white text-green-800" : "bg-green-800 text-white" 
           } `}>
             yes
           </button>
-          <button type="button" id="parkingSpot" value={false}
+          <button type="button" id="parking" value={false}
           onClick={onChange}
           className={`ml-3 uppercase px-7 py-3 font-medium test-sm shadow-md rounded hover:shadow-lg focus:shadow-lg active:shadow-lg transition duration-150 ease-in-out w-full ${
-            parkingSpot ? "bg-white text-green-800" : "bg-green-800 text-white" 
+            parking ? "bg-white text-green-800" : "bg-green-800 text-white" 
           } `}>
             no
           </button>
