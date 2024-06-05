@@ -162,7 +162,7 @@ export default function Profile() {
             <h2 className=" uppercase text-2xl text-center font-semibold mb-6">
               My Listings
             </h2>
-            <ul>{listings.map((listing) => (
+            <ul className="sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 mt-6 mb-6  ">{listings.map((listing) => (
               <ListingItems 
               key={listing.id} 
               id={listing.id}  
