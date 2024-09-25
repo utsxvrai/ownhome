@@ -17,7 +17,7 @@ export default function CreateListing() {
   const navigate = useNavigate();
   const auth = getAuth();
   const [geolocationEnabled, setGeolocationEnabled] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // this are hooks
   const [formData, setFormData] = useState({
     type: "rent",
     name: "",
