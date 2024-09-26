@@ -9,8 +9,7 @@ import {
 } from "firebase/storage";
 import { getAuth } from "firebase/auth";
 import { v4 as uuidv4 } from "uuid";
-import { addDoc,
-    collection,
+import {
     doc,
     getDoc,
     serverTimestamp,
@@ -22,10 +21,9 @@ import { useNavigate, useParams } from "react-router-dom";
 export default function CreateListing() {
     const navigate = useNavigate();
     const auth = getAuth();
-    const [geolocationEnabled, setGeolocationEnabled] = useState(true);
+    const [geolocationEnabled] = useState(true);
     const [loading, setLoading] = useState(false); // this are hooks
     const [listing, setListing] = useState(null);
-    const opencage = require('opencage-api-client');
     const [formData, setFormData] = useState({
         type: "rent",
         name: "",
@@ -108,116 +106,105 @@ export default function CreateListing() {
             }));
         }
     }
+    async function storeImage(image) {
+        return new Promise((resolve, reject) => {
+            const storage = getStorage();
+            const filename = `${auth.currentUser.uid}-${image.name}-${uuidv4()}`;
+            const storageRef = ref(storage, filename);
+            const uploadTask = uploadBytesResumable(storageRef, image);
+
+            uploadTask.on(
+                "state_changed",
+                (snapshot) => {
+                    // Observe state change events such as progress, pause, and resume
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    console.log("Upload is " + progress + "% done");
+                    switch (snapshot.state) {
+                        case "paused":
+                            console.log("Upload is paused");
+                            break;
+                        case "running":
+                            console.log("Upload is running");
+                            break;
+                    }
+                },
+                (error) => {
+                    // Handle unsuccessful uploads
+                    reject(error);
+                },
+                () => {
+                    // Handle successful uploads on complete
+                    getDownloadURL(uploadTask.snapshot.ref)
+                        .then((downloadURL) => {
+                            resolve(downloadURL);
+                        })
+                        .catch((error) => {
+                            reject(error); // Reject if getting the download URL fails
+                        });
+                }
+            );
+        });
+    }
+
     async function onSubmit(e) {
         e.preventDefault();
         setLoading(true);
+
+        // Validate prices
         if (+discountedPrice >= +regularPrice) {
             setLoading(false);
             toast.error("Discounted price needs to be less than regular price");
             return;
         }
+
+        // Validate images count
         if (images.length > 6) {
             setLoading(false);
-            toast.error("maximum 6 images are allowed");
+            toast.error("Maximum 6 images are allowed");
             return;
         }
 
-        let geolocation = {};
+        // Initialize geolocation
+        const geolocation = { lat: 0, lng: 0 };
 
-        if (geolocationEnabled) {
-            const encodedAddress = encodeURIComponent(address);
-            console.log("API Key:", process.env.REACT_APP_OPENCAGE_API_KEY);
+        let imgUrls = []; // Initialize imgUrls as an empty array
 
-            try {
-                const response = await opencage.geocode({
-                    q: encodedAddress,
-                    key: process.env.REACT_APP_OPENCAGE_API_KEY,
-                });
-                console.log("OpenCage API Response:", response); // Log the full response
+        try {
+            // Upload images and get URLs
+            imgUrls = await Promise.all([...images].map((image) => storeImage(image)));
 
-                if (response.status.code === 200 && response.results.length > 0) {
-                    const place = response.results[0];
-                    geolocation.lat = place.geometry.lat;
-                    geolocation.lng = place.geometry.lng;
-                } else {
-                    setLoading(false);
-                    toast.error("No results found. Please enter a correct address.");
-                    return;
-                }
-            } catch (error) {
-                setLoading(false);
-                console.error("Error fetching location data:", error); // Detailed logging
-                toast.error(`Error fetching location data: ${error.message}`);
-                return;
+            // Check if imgUrls contains any undefined values
+            if (imgUrls.includes(undefined) || imgUrls.length === 0) {
+                throw new Error("One or more images failed to upload.");
             }
-        } else {
-            geolocation.lat = latitude;
-            geolocation.lng = longitude;
-        }
 
-        async function storeImage(image) {
-            return new Promise((resolve, reject) => {
-                const storage = getStorage();
-                const filename = `${auth.currentUser.uid}-${image.name}-${uuidv4()}`;
-                const storageRef = ref(storage, filename);
-                const uploadTask = uploadBytesResumable(storageRef, image);
-                uploadTask.on(
-                    "state_changed",
-                    (snapshot) => {
-                        // Observe state change events such as progress, pause, and resume
-                        // Get task progress, including the number of bytes uploaded and the total number of bytes to be uploaded
-                        const progress =
-                            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        console.log("Upload is " + progress + "% done");
-                        switch (snapshot.state) {
-                            case "paused":
-                                console.log("Upload is paused");
-                                break;
-                            case "running":
-                                console.log("Upload is running");
-                                break;
-                        }
-                    },
-                    (error) => {
-                        // Handle unsuccessful uploads
-                        reject(error);
-                    },
-                    () => {
-                        // Handle successful uploads on complete
-                        // For instance, get the download URL: https://firebasestorage.googleapis.com/...
-                        getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-                            resolve(downloadURL);
-                        });
-                    }
-                );
-            });
-        }
+            // Prepare the form data for Firestore
+            const formDataCopy = {
+                ...formData,
+                imgUrls,
+                geolocation,
+                timestamp: serverTimestamp(),
+                userRef: auth.currentUser.uid,
+            };
 
-        const imgUrls = await Promise.all(
-            [...images].map((image) => storeImage(image))
-        ).catch((error) => {
+            // Clean up the form data
+            delete formDataCopy.images; // Remove images from formDataCopy
+            if (!formDataCopy.offer) delete formDataCopy.discountedPrice;
+            delete formDataCopy.latitude;
+            delete formDataCopy.longitude;
+
+            // Update the document in Firestore
+            const docRef = doc(db, "listings", params.listingId);
+            await updateDoc(docRef, formDataCopy);
+
             setLoading(false);
-            toast.error("Images not uploaded");
-            return;
-        });
-
-        const formDataCopy = {
-            ...formData,
-            imgUrls,
-            geolocation,
-            timestamp: serverTimestamp(),
-            userRef: auth.currentUser.uid,
-        };
-        delete formDataCopy.images;
-        !formDataCopy.offer && delete formDataCopy.discountedPrice;
-        delete formDataCopy.latitude;
-        delete formDataCopy.longitude;
-        const docRef = doc(db, "listings", params.listingId);
-
-        await updateDoc(docRef, formDataCopy);
-        setLoading(false);
-        toast.success("Listing Edited");
-        navigate(`/category/${formDataCopy.type}/${docRef.id}`);
+            toast.success("Listing Edited Successfully");
+            navigate(`/category/${formDataCopy.type}/${docRef.id}`);
+        } catch (error) {
+            setLoading(false);
+            toast.error(`Error: ${error.message}`);
+            console.error("Error details:", error); // Log the error for debugging
+        }
     }
 
 
@@ -383,7 +370,7 @@ export default function CreateListing() {
                            className="w-full px-4 py-1.5 text-green-900 bg-white border border-green-300 rounded transition duration-15 ease-in-out focus:bg-white focus:border-green-700 focus:text-green-900 mt-3"
                     />
                 </div>
-                <button type="submit" onChange="onSubmit" className="w-full mb-6 uppercase bg-green-800 text-white px-7 py-3 text-sm font-semibold rounded shadow-md  mt-6 transition duration-150 ease-in-out hover:bg-green-700 hover:shadow-xl active:bg-green-800" >
+                <button type="submit" className="w-full mb-6 uppercase bg-green-800 text-white px-7 py-3 text-sm font-semibold rounded shadow-md  mt-6 transition duration-150 ease-in-out hover:bg-green-700 hover:shadow-xl active:bg-green-800" >
                     Edit Listing</button>
 
             </form>

@@ -16,7 +16,7 @@ import { useNavigate } from "react-router-dom";
 export default function CreateListing() {
   const navigate = useNavigate();
   const auth = getAuth();
-  const [geolocationEnabled, setGeolocationEnabled] = useState(true);
+  const [geolocationEnabled] = useState(true);
   const [loading, setLoading] = useState(false); // this are hooks
   const [formData, setFormData] = useState({
     type: "rent",
@@ -116,39 +116,41 @@ export default function CreateListing() {
         const storageRef = ref(storage, filename);
         const uploadTask = uploadBytesResumable(storageRef, image);
         uploadTask.on(
-          "state_changed",
-          (snapshot) => {
-            // Observe state change events such as progress, pause, and resume
-            // Get task progress, including the number of bytes uploaded and the total number of bytes to be uploaded
-            const progress =
-              (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            console.log("Upload is " + progress + "% done");
-            switch (snapshot.state) {
-              case "paused":
-                console.log("Upload is paused");
-                break;
-              case "running":
-                console.log("Upload is running");
-                break;
+            "state_changed",
+            (snapshot) => {
+              // Observe state change events such as progress, pause, and resume
+              // Get task progress, including the number of bytes uploaded and the total number of bytes to be uploaded
+              const progress =
+                  (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              console.log("Upload is " + progress + "% done");
+              switch (snapshot.state) {
+                case "paused":
+                  console.log("Upload is paused");
+                  break;
+                case "running":
+                  console.log("Upload is running");
+                  break;
+                default :
+                  console.log("Invalid")
+              }
+            },
+            (error) => {
+              // Handle unsuccessful uploads
+              reject(error);
+            },
+            () => {
+              // Handle successful uploads on complete
+              // For instance, get the download URL: https://firebasestorage.googleapis.com/...
+              getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+                resolve(downloadURL);
+              });
             }
-          },
-          (error) => {
-            // Handle unsuccessful uploads
-            reject(error);
-          },
-          () => {
-            // Handle successful uploads on complete
-            // For instance, get the download URL: https://firebasestorage.googleapis.com/...
-            getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-              resolve(downloadURL);
-            });
-          }
         );
       });
     }
 
     const imgUrls = await Promise.all(
-      [...images].map((image) => storeImage(image))
+        [...images].map((image) => storeImage(image))
     ).catch((error) => {
       setLoading(false);
       toast.error("Images not uploaded");
@@ -275,7 +277,7 @@ export default function CreateListing() {
         )}
 
         <p className="text-lg mt-3 font-semibold"> Description </p> 
-        <textarea type="text" id="description" value={description} onChange={onChange} placeholder="Description" maxLength="50" minLength="10" required 
+        <textarea type="text" id="description" value={description} onChange={onChange} placeholder="Description" maxLength="300" minLength="10" required
         className=" w-full px-4 py-2 text-xl text-green-900 bg-white border border-green-300 rounded transition duration-150 ease-in-out
         focus:text-green-900 focus:bg-white focus:border-green-700 mb-3"
         ></textarea>
@@ -334,10 +336,12 @@ export default function CreateListing() {
             className="w-full px-4 py-1.5 text-green-900 bg-white border border-green-300 rounded transition duration-15 ease-in-out focus:bg-white focus:border-green-700 focus:text-green-900 mt-3"
           />
         </div>
-        <button type="submit" onChange="onSubmit" className="w-full mb-6 uppercase bg-green-800 text-white px-7 py-3 text-sm font-semibold rounded shadow-md  mt-6 transition duration-150 ease-in-out hover:bg-green-700 hover:shadow-xl active:bg-green-800" >
+        <button type="submit"  className="w-full mb-6 uppercase bg-green-800 text-white px-7 py-3 text-sm font-semibold rounded shadow-md  mt-6 transition duration-150 ease-in-out hover:bg-green-700 hover:shadow-xl active:bg-green-800" >
           Create Listing</button>
 
+
       </form>
+
     </main>
   )
 }
