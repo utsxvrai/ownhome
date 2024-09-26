@@ -51,8 +51,8 @@ export default function Listing() {
         <main>
             <Swiper
                 slidesPerView={1}
-                // navigation
-                // pagination={{ type: "progressbar"  }}
+                navigation
+                pagination={{ type: "progressbar"  }}
                 effect="fade"
                 modules={[EffectFade]}
                 autoplay={{ delay: 3000 }}
@@ -153,7 +153,7 @@ export default function Listing() {
                 <div className="w-full h-[200px] md:h-[400px] z-10 overflow-x-hidden mt-6 md:mt-0 md:ml-2">
 
                     <MapContainer
-                        center={[24.641130, 77.314020]}
+                        center={[36.174465, -86.767960]}
                         zoom={13}
                         scrollWheelZoom={false}
                         style={{ height: "100%", width: "100%" }}
@@ -163,7 +163,7 @@ export default function Listing() {
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
                         <Marker
-                            position={[24.641130, 77.314020]}
+                            position={[36.174465, -86.767960]}
                         >
                             <Popup>
                                 {listing.address}
